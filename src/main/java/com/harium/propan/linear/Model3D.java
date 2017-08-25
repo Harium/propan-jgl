@@ -1,0 +1,258 @@
+package com.harium.propan.linear;
+
+
+import java.awt.Color;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import com.harium.etyl.loader.image.ImageLoader;
+import com.harium.propan.GLDrawable;
+import com.harium.propan.awt.material.Texture;
+import com.harium.propan.core.loader.MeshLoader;
+import com.harium.propan.core.model.Face;
+import com.harium.propan.core.model.Group;
+import com.harium.propan.core.model.Model;
+import org.jgl.GL;
+import org.jgl.GLAUX;
+
+import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.math.Vector3;
+
+public class Model3D extends AimPoint implements GLDrawable {
+
+	private Color color = Color.BLACK; 
+	private Model model;
+
+	private double scale = 1;
+
+	private boolean drawTexture = true;
+	private boolean drawFaces = true;
+	private boolean drawVertices = true;
+
+	//TODO Just for test, Remove!
+	public Integer specialVertex = 0;
+
+	private Map<String, Texture> textureMap = new HashMap<String, Texture>();
+
+	public Model3D(String path) {
+		super(0,0,0);
+
+		this.model = MeshLoader.getInstance().loadModel(path);
+	}
+
+	@Override
+	public void draw(GLAUX gl) {
+
+		gl.glPushMatrix();
+
+		gl.glColor3i(color.getRed(), color.getGreen(), color.getBlue());
+
+		if(scale!=1) {
+			gl.glScaled(2, 2, 2);	
+		}
+
+		//gl.glTranslated(x, y, z);
+		gl.glRotated(angleY, 0, 1, 0);
+		gl.glRotated(angleZ, 0, 0, 1);
+		//gl.glBegin(GL.GL_QUADS);
+
+		drawFaces(gl);
+
+		//drawVertexes(gl);
+
+		//gl.glEnd();
+
+		gl.glPopMatrix();
+
+	}
+
+	private void drawFaces(GLAUX gl) {
+
+		if(!drawFaces) {
+			return;
+		}
+
+		for(Group group: model.getGroups()) {
+
+			String map = group.getMaterial().getMapD();
+			//map = "";
+
+			if(!map.isEmpty()) {
+
+				Texture texture = getTexture(map);
+
+
+				if(drawTexture) {
+
+					setTexture(gl, texture);
+					gl.glEnable (GL.GL_DEPTH_TEST);
+					gl.glEnable (GL.GL_TEXTURE_2D);
+					gl.glEnable (GL.GL_CULL_FACE);
+
+				}
+
+				//gl.glBegin(GL.GL_QUADS);
+
+				float offsetX = 1f;
+				float offsetZ = -3f;
+				float size = 1.0f;
+
+				/*gl.glTexCoord2f(0.0f, 1.0f);
+			gl.glVertex3f(-offsetX-size, 0, +size+offsetZ);
+			gl.glTexCoord2f(1.0f, 1.0f);
+			gl.glVertex3f(-offsetX+size, 0.8f, +size+offsetZ);
+			gl.glTexCoord2f(1.0f, 0.0f);
+			gl.glVertex3f(-offsetX+size, 0.6f, +offsetZ);
+			gl.glTexCoord2f(0.0f, 0.0f);
+			gl.glVertex3f(-offsetX-size, 0, +offsetZ);*/
+
+
+				//gl.glEnd();
+			}
+
+			for(Face face: group.getFaces()) {
+
+				if(face.vertexIndex.length==3) {
+
+					gl.glBegin(GL.GL_TRIANGLES);
+
+				} else { //TODO Transform all faces in tris
+
+					gl.glBegin(GL.GL_QUADS);
+
+				}
+
+				for(int i=0;i<face.vertexIndex.length;i++) {
+
+					if(drawTexture) {
+						Vector3 normal = model.getNormals().get(face.normalIndex[i]);
+						gl.glNormal3d(normal.x, normal.y, normal.z);
+
+						Vector2 textureCoordinate = model.getTextures().get(face.textureIndex[i]);
+						gl.glTexCoord2d(textureCoordinate.x, textureCoordinate.y);
+					}
+
+					int index = face.vertexIndex[i];
+
+					Vector3 vertex = model.getVertices().get(index);
+
+					gl.glVertex3d(vertex.x, vertex.y, vertex.z);
+				}
+
+				gl.glEnd();
+			}
+		}
+	}
+
+	private Texture getTexture(String map) {
+
+		Texture texture = textureMap.get(map);
+
+		if(texture==null) {
+			System.out.println("Trying to load: "+map);
+
+			texture = new Texture(ImageLoader.getInstance().getImage(map,true));
+			textureMap.put(map, texture);
+		}
+
+		return texture;
+
+	}
+
+	public void drawVertexes(GLAUX gl) {
+
+		double vsize = 0.015;
+
+		List<Vector3> vertices = model.getVertices();
+
+		gl.glColor3i(0x66,0x44,0x44);
+		
+		for(int i=0;i<vertices.size(); i++) {
+
+			if(i == specialVertex) {
+				gl.glColor3i(0xff,0xff,0x00);
+				vsize*=2;
+			}
+
+			gl.glPushMatrix();
+			gl.glTranslated(vertices.get(i).x, vertices.get(i).y, vertices.get(i).z);
+			gl.auxSolidCube(vsize);
+			gl.glPopMatrix();
+		}
+	}
+
+	protected void setTexture(GL gl, Texture texture) {
+
+		gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGB, (int)texture.getW(), (int)texture.getH(), 0,
+				GL.GL_RGB, GL.GL_UNSIGNED_BYTE, texture.getBytes());
+
+		//gl.glTexGeni(GL.GL_S, GL.GL_TEXTURE_GEN_MODE, GL.GL_OBJECT_LINEAR);
+
+		//int sgenIparams[] = {1, 1, 1, 0};
+
+		//gl.glTexGeniv(GL.GL_S, GL.GL_OBJECT_PLANE, sgenIparams);
+
+	}
+
+	protected void setAlphaTexture(GL gl, Texture texture) {
+
+		//gl.glEnable(GL.GL_ALPHA_TEST);
+
+		gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA, (int)texture.getW(), (int)texture.getH(), 0,
+				GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, texture.getAlphaBytes());
+
+		gl.glEnable(GL.GL_BLEND);
+		gl.glBlendFunc(GL.GL_SRC_ALPHA, GL.GL_ONE_MINUS_SRC_ALPHA);
+
+	}
+
+	/*public Set<Integer> getVertexSelection() {
+		return vertexSelection;
+	}
+
+	public void setVertexSelection(Set<Integer> vertexSelection) {
+		this.vertexSelection = vertexSelection;
+	}
+*/
+	public boolean isDrawTexture() {
+		return drawTexture;
+	}
+
+	public void setDrawTexture(boolean drawTexture) {
+		this.drawTexture = drawTexture;
+	}
+
+	public boolean isDrawFaces() {
+		return drawFaces;
+	}
+
+	public void setDrawFaces(boolean drawFaces) {
+		this.drawFaces = drawFaces;
+	}
+
+	public boolean isDrawVertices() {
+		return drawVertices;
+	}
+
+	public void setDrawVertices(boolean drawVertices) {
+		this.drawVertices = drawVertices;
+	}
+
+	public double getScale() {
+		return scale;
+	}
+
+	public void setScale(double scale) {
+		this.scale = scale;
+	}
+
+	public Model getModel() {
+		return model;
+	}
+
+	public void setModel(Model model) {
+		this.model = model;
+	}
+
+}
